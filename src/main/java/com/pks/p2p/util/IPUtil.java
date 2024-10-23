@@ -15,8 +15,7 @@ public class IPUtil {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(new URI("https://checkip.amazonaws.com").toURL().openStream()))){
             return reader.readLine();
         } catch (IOException | URISyntaxException e) {
-            System.out.println();
+            return "127.0.0.1";
         }
-        return null;
     }
 }

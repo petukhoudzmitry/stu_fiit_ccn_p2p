@@ -1,6 +1,7 @@
 package com.pks.p2p.protocol;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import java.util.zip.CRC32;
 
 public class Header {
@@ -62,5 +63,28 @@ public class Header {
 
     public long getChecksum() {
         return checksum;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Header header = (Header) o;
+        return messageType == header.messageType && sequenceNumber == header.sequenceNumber && length == header.length && checksum == header.checksum;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(messageType, sequenceNumber, length, checksum);
+    }
+
+    @Override
+    public String toString() {
+        return "Header{" +
+                "messageType=" + messageType +
+                ", sequenceNumber=" + sequenceNumber +
+                ", length=" + length +
+                ", checksum=" + checksum +
+                '}';
     }
 }
