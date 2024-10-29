@@ -15,5 +15,4 @@ public class ByteArrayUtil {
 
         return result;
     }
-
 }

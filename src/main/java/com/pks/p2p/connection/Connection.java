@@ -3,94 +3,85 @@ package com.pks.p2p.connection;
 import com.pks.p2p.enums.MessageTypes;
 import com.pks.p2p.enums.StringConstants;
 import com.pks.p2p.protocol.Header;
+import com.pks.p2p.util.ByteArrayUtil;
 
 import java.io.IOException;
 import java.net.*;
-import java.util.Scanner;
+import java.nio.ByteBuffer;
+import java.util.List;
+
 import static com.pks.p2p.util.InputReaderUtil.readInput;
-import static com.pks.p2p.configs.Configurations.INPUT_TIMEOUT_SECONDS;
 
 public class Connection {
 
     private static volatile boolean connected = false;
-    private static volatile boolean isListening = false;
     private static volatile InetAddress address;
     private static volatile int port;
     private static volatile boolean running = false;
 
-
-
     private static volatile boolean synSent = false;
-
-    public static boolean isIsListening() {
-        return isListening;
-    }
-
-    synchronized public static InetAddress getAddress() {
-        return address;
-    }
-
-    synchronized public static int getPort() {
-        return port;
-    }
 
     public static void listen(DatagramSocket socket) {
         new Thread(() -> {
             try{
-                isListening = true;
-                running = true;
-                while(running) {
+                while(getConnected()) {
                     byte[] buffer = new byte[1024];
                     DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+
                     try {
                         socket.receive(packet);
                     } catch (SocketException e) {
                         break;
                     }
 
-                    int messageType = Header.fromBytes(packet.getData()).getMessageType();
+                    if(!packet.getAddress().equals(address) || packet.getPort() != port) {
+                        System.out.println("Received a packet from an unknown source. Ignoring...");
+                        continue;
+                    }
 
-                    if(messageType == MessageTypes.SYN.getValue() && !connected) {
-                        Header synAckHeader = new Header(MessageTypes.SYN_ACK.getValue(), 0);
-                        byte[] synAckPacket = synAckHeader.toBytes();
-                        DatagramPacket synAckResponse = new DatagramPacket(synAckPacket, synAckPacket.length, packet.getAddress(), packet.getPort());
-                        socket.send(synAckResponse);
-                    } else if(messageType == MessageTypes.ACK.getValue() && !connected) {
-                        address = packet.getAddress();
-                        port = packet.getPort();
-                        connected = true;
-                    } else if(messageType == MessageTypes.DATA.getValue() && connected) {
+
+                    byte[] data = packet.getData();
+                    Header header = Header.fromBytes(data);
+                    int messageType = header.getMessageType();
+
+                    if(messageType == MessageTypes.DATA.getValue() && getConnected()) {
                         System.out.println("Received message: ");
 
-                        System.out.println(packet.getLength());
+                        byte[] message = new byte[header.getLength()];
+                        System.arraycopy(data, 20, message, 0, message.length);
 
-                        int counter = 0;
-                        while (packet.getLength() >= buffer.length) {
-                            socket.receive(packet);
-                            if (counter == 0) {
-                                for(int i = 20; i < packet.getLength(); i++) {
-                                    System.out.print((char) buffer[i]);
-                                }
-                                counter += 1;
-                            } else {
-                                System.out.print(new String(buffer));
-                            }
-                        }
-                        System.out.println();
+                        System.out.println(new String(message));
                     }
                 }
                 socket.close();
             } catch(IOException e) {
-                isListening = false;
                 e.printStackTrace();
             }
 
         }).start();
     }
 
+    public static void sendData(DatagramSocket socket, String data) {
+        byte[] bytes = data.getBytes();
+        List<byte[]> chunkedData = ByteArrayUtil.chunkByteArray(bytes, 1004);
+        for(int i = 0; i < chunkedData.size(); i++) {
+            byte[] headerBytes = new Header(MessageTypes.DATA.getValue(), i, chunkedData.get(i).length, bytes).toBytes();
+            ByteBuffer bb = ByteBuffer.allocate(headerBytes.length + chunkedData.get(i).length);
+            bb.put(headerBytes);
+            bb.put(chunkedData.get(i));
+
+            byte[] message = bb.array();
+            try {
+                socket.send(new DatagramPacket(message, message.length, address, port));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
     public static void handshake(DatagramSocket socket) {
         Thread sendSyn = sendSyn(socket);
-        Thread listenToHandshakeThread = listenHandshake(socket);
+        Thread listenToHandshakeThread = listenToHandshake(socket);
 
         sendSyn.start();
         listenToHandshakeThread.start();
@@ -99,12 +90,14 @@ public class Connection {
             if(getConnected()) {
                 sendSyn.interrupt();
                 listenToHandshakeThread.interrupt();
+                setRunning(true);
+                listen(socket);
                 break;
             }
         }
     }
 
-    private static Thread listenHandshake(DatagramSocket socket) {
+    private static Thread listenToHandshake(DatagramSocket socket) {
         return new Thread(() -> {
             while(!getConnected()){
                 try {
@@ -145,20 +138,31 @@ public class Connection {
     private static Thread sendSyn(DatagramSocket socket) {
         return new Thread(() -> {
             if (!getSynSent()) {
-                try (Scanner sc = new Scanner(System.in)) {
+                try{
                     System.out.println("Enter the IP address of the peer:");
-                    String ip = readInput(INPUT_TIMEOUT_SECONDS);
-                    while (!ip.matches(StringConstants.IP_PATTERN.getValue())) {
-                        System.out.println("Wrong IP address format. Please enter a valid IP address:");
-                        ip = readInput(INPUT_TIMEOUT_SECONDS);
+                    String ip = readInput(System.in, () -> !Connection.getConnected());
+
+                    if(ip == null) {
+                        return;
+                    }else {
+                        while (!ip.matches(StringConstants.IP_PATTERN.getValue())) {
+                            System.out.println("Wrong IP address format. Please enter a valid IP address:");
+
+                            ip = readInput(System.in, () -> !Connection.getConnected());
+                        }
                     }
+
                     System.out.println("Enter the port of the peer:");
 
-                    String port = readInput(INPUT_TIMEOUT_SECONDS);
+                    String port = readInput(System.in, () -> !Connection.getConnected());
 
-                    while (!port.matches(StringConstants.PORT_PATTERN.getValue())) {
-                        System.out.println("Wrong port format. Please enter a valid port:");
-                        port = readInput(INPUT_TIMEOUT_SECONDS);
+                    if(port == null) {
+                        return;
+                    } else {
+                        while (!port.matches(StringConstants.PORT_PATTERN.getValue())) {
+                            System.out.println("Wrong port format. Please enter a valid port:");
+                            port = readInput(System.in, () -> !Connection.getConnected());
+                        }
                     }
 
                     Header header = new Header(MessageTypes.SYN.getValue(), 0);
@@ -166,8 +170,11 @@ public class Connection {
 
                     address = InetAddress.getByName(ip);
 
-                    DatagramPacket synRequest = new DatagramPacket(synPacket, synPacket.length, address, Integer.parseInt(port));
-                    socket.send(synRequest);
+                    if(!Connection.getConnected()){
+                        DatagramPacket synRequest = new DatagramPacket(synPacket, synPacket.length, address, Integer.parseInt(port));
+                        socket.send(synRequest);
+                        setSynSent(true);
+                    }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -175,7 +182,19 @@ public class Connection {
         });
     }
 
-    private synchronized static boolean getSynSent() {
+    synchronized public static InetAddress getAddress() {
+        return address;
+    }
+
+    synchronized public static int getPort() {
+        return port;
+    }
+
+    synchronized private static void setSynSent(boolean value) {
+        synSent = value;
+    }
+
+    synchronized private static boolean getSynSent() {
         return synSent;
     }
 

@@ -3,10 +3,10 @@ package com.pks.p2p;
 import com.pks.p2p.connection.Connection;
 import com.pks.p2p.sockets.ClientSocket;
 import com.pks.p2p.util.IPUtil;
+import com.pks.p2p.util.InputReaderUtil;
 
 import java.net.*;
 import java.util.Random;
-import java.util.Scanner;
 
 public class Main {
 
@@ -32,21 +32,14 @@ public class Main {
 
         System.out.println("Socket is bound to port " + socket.getLocalPort());
 
-        Scanner sc = new Scanner(System.in);
-
         label:
-        while(true) {
-            System.out.println("Enter 'listen' to listen for incoming connections, 'connect' to connect to a socket or 'exit' to close the socket.");
-            String line = sc.nextLine();
+        while(!Connection.getConnected()) {
+            System.out.println("Enter 'connect' to connect to a peer or 'exit' to close the program.");
+            String line = InputReaderUtil.readInput(System.in, () -> true);
+            line = line == null ? "" : line;
             switch (line) {
                 case "exit":
-                    System.out.println("Closing socket...");
                     Connection.setRunning(false);
-                    socket.close();
-                    return;
-
-                case "listen":
-                    Connection.listen(socket);
                     break label;
                 case "connect":
                     Connection.handshake(socket);
@@ -54,7 +47,18 @@ public class Main {
             }
         }
 
+        while(Connection.getConnected()) {
+            System.out.println("Enter a message to send to the peer or ':exit!' to close the program.");
+            String line = InputReaderUtil.readInput(System.in, () -> true);
+            if (":exit!".equals(line)) {
+                Connection.setRunning(false);
+                break;
+            }
+            Connection.sendData(socket, line);
+        }
+
         System.out.println("Closing socket...");
         socket.close();
+        System.in.close();
     }
 }
