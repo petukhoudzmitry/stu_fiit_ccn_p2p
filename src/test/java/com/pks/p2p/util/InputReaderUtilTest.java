@@ -8,15 +8,16 @@ public class InputReaderUtilTest {
 
     @Test
     public void noInput_readInput_returnsNull() {
-        String input = InputReaderUtil.readInput(System.in, () -> true);
+        long startTime = System.currentTimeMillis();
+        String input = InputReaderUtil.readInput(System.in, () -> System.currentTimeMillis() - startTime < 2000);
         assert null == input;
     }
 
     @Test
     public void inputWithinTimeout_readInput_returnsInput() {
         String txt = "test";
-        String input = InputReaderUtil.readInput(new ByteArrayInputStream(txt.getBytes()), () -> true);
+        long startTime = System.currentTimeMillis();
+        String input = InputReaderUtil.readInput(new ByteArrayInputStream(txt.getBytes()), () -> System.currentTimeMillis() - startTime < 2000);
         assert txt.equals(input);
     }
-
 }

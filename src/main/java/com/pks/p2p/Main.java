@@ -1,5 +1,6 @@
 package com.pks.p2p;
 
+import com.pks.p2p.communication.Sender;
 import com.pks.p2p.connection.Connection;
 import com.pks.p2p.sockets.ClientSocket;
 import com.pks.p2p.util.IPUtil;
@@ -32,29 +33,19 @@ public class Main {
 
         System.out.println("Socket is bound to port " + socket.getLocalPort());
 
-        label:
-        while(!Connection.getConnected()) {
-            System.out.println("Enter 'connect' to connect to a peer or 'exit' to close the program.");
-            String line = InputReaderUtil.readInput(System.in, () -> true);
-            line = line == null ? "" : line;
-            switch (line) {
-                case "exit":
-                    Connection.setRunning(false);
-                    break label;
-                case "connect":
-                    Connection.handshake(socket);
-                    break label;
-            }
+        Connection.handshake(socket);
+
+        long startTime = System.currentTimeMillis();
+        while(!Connection.getConnected() && System.currentTimeMillis() - startTime < 5_000) {
         }
 
         while(Connection.getConnected()) {
             System.out.println("Enter a message to send to the peer or ':exit!' to close the program.");
             String line = InputReaderUtil.readInput(System.in, () -> true);
             if (":exit!".equals(line)) {
-                Connection.setRunning(false);
                 break;
             }
-            Connection.sendData(socket, line);
+            Sender.sendData(socket, line);
         }
 
         System.out.println("Closing socket...");

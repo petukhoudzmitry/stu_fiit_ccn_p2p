@@ -1,8 +1,11 @@
 package com.pks.p2p.protocol;
 
+import com.pks.p2p.configs.Configurations;
+
 import java.nio.ByteBuffer;
 import java.util.Objects;
-import java.util.zip.CRC32;
+
+import static com.pks.p2p.util.Checksum.calculateChecksum;
 
 public class Header {
 
@@ -16,28 +19,23 @@ public class Header {
         this.messageType = messageType;
         this.sequenceNumber = sequenceNumber;
         this.length = length;
-        this.checksum = calculateChecksum(data);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(data.length + Configurations.HEADER_LENGTH - 8);
+        byteBuffer.putInt(this.messageType).putInt(this.sequenceNumber).putInt(this.length).put(data);
+        this.checksum = calculateChecksum(byteBuffer.array());
     }
 
     public Header(int messageType, int sequenceNumber) {
         this.messageType = messageType;
         this.sequenceNumber = sequenceNumber;
         this.length = 0;
-        this.checksum = 0L;
-    }
-
-    private long calculateChecksum(byte[] data) {
-        CRC32 crc32 = new CRC32();
-        crc32.update(data);
-        return crc32.getValue();
+        ByteBuffer byteBuffer = ByteBuffer.allocate(Configurations.HEADER_LENGTH - 8);
+        byteBuffer.putInt(this.messageType).putInt(this.sequenceNumber).putInt(this.length).put(new byte[0]);
+        this.checksum = calculateChecksum(byteBuffer.array());
     }
 
     public byte[] toBytes() {
-        ByteBuffer buffer = ByteBuffer.allocate(20);
-        buffer.putInt(messageType);
-        buffer.putInt(sequenceNumber);
-        buffer.putInt(length);
-        buffer.putLong(checksum);
+        ByteBuffer buffer = ByteBuffer.allocate(Configurations.HEADER_LENGTH);
+        buffer.putInt(messageType).putInt(sequenceNumber).putInt(length).putLong(checksum);
         return buffer.array();
     }
 
@@ -46,7 +44,10 @@ public class Header {
         int messageType = buffer.getInt();
         int sequenceNumber = buffer.getInt();
         int length = buffer.getInt();
-        return new Header(messageType, sequenceNumber, length, new byte[0]);
+        buffer.getLong();
+        byte[] data = new byte[length];
+        buffer.get(data);
+        return new Header(messageType, sequenceNumber, length, data);
     }
 
     public int getSequenceNumber() {
