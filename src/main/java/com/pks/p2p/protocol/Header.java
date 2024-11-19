@@ -39,6 +39,11 @@ public class Header {
         return buffer.array();
     }
 
+    public byte[] toBytesForChecksum() {
+        ByteBuffer buffer = ByteBuffer.allocate(Configurations.HEADER_LENGTH - 8);
+        return buffer.putInt(messageType).putInt(sequenceNumber).putInt(length).array();
+    }
+
     public static Header fromBytes(byte[] bytes) {
         ByteBuffer buffer = ByteBuffer.wrap(bytes);
         int messageType = buffer.getInt();

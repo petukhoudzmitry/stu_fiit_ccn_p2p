@@ -1,25 +1,52 @@
 package com.pks.p2p.sockets;
 
+import java.io.IOException;
+import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
 
 
 public class ClientSocket {
 
-    private static volatile DatagramSocket socket = null;
+    private volatile DatagramSocket socket = null;
 
-    public static DatagramSocket getInstance(int port) {
+    public ClientSocket(int port) {
+        setSocket(port);
+    }
+
+    public synchronized DatagramSocket getSocket() {
+        return socket;
+    }
+
+    private synchronized void setSocket(int port) {
         try {
-            if(socket == null) {
-                synchronized (ClientSocket.class) {
-                    if(socket == null) {
-                        socket = new DatagramSocket(port);
-                    }
-                }
-            }
+            this.socket = new DatagramSocket(port);
         } catch (SocketException e) {
             System.out.println(e.getMessage());
         }
-        return socket;
+    }
+
+    public synchronized void close() {
+        socket.close();
+    }
+
+    public synchronized void receive(DatagramPacket packet) {
+        try{
+            socket.receive(packet);
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    public synchronized int getPort() {
+        return socket.getLocalPort();
+    }
+
+    public void send(DatagramPacket packet) {
+        try {
+            socket.send(packet);
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
+        }
     }
 }

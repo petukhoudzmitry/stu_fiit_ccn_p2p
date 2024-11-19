@@ -8,4 +8,8 @@ public class Checksum {
         crc32.update(data);
         return crc32.getValue();
     }
+
+    public static boolean checkChecksum(byte[] data, long checksum) {
+        return Checksum.calculateChecksum(data) != checksum;
+    }
 }

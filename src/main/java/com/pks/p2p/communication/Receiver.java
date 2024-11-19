@@ -2,67 +2,92 @@ package com.pks.p2p.communication;
 
 import com.pks.p2p.configs.Configurations;
 import com.pks.p2p.connection.Connection;
-import com.pks.p2p.enums.MessageTypes;
+import com.pks.p2p.enums.MessageType;
+import com.pks.p2p.handlers.PackageHandler;
 import com.pks.p2p.protocol.Header;
 import com.pks.p2p.util.Checksum;
 
-import java.io.IOException;
 import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.SocketException;
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Objects;
 
 public class Receiver {
-    public static void listen(DatagramSocket socket) {
-        new Thread(() -> {
-            try{
-                while(Connection.getConnected()) {
-                    byte[] buffer = new byte[Configurations.MAX_PACKET_SIZE];
-                    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 
-                    try {
-                        socket.receive(packet);
-                    } catch (SocketException e) {
-                        break;
-                    }
+    private final Connection connection;
+    private final List<PackageHandler> packageHandlers;
+    private volatile Thread listenerThread = null;
+    private volatile boolean isListening = false;
 
-                    if(!packet.getAddress().equals(Connection.getAddress()) || packet.getPort() != Connection.getPort()) {
-                        System.out.println("Received a packet from an unknown source. Ignoring...");
-                        continue;
-                    }
-
-                    byte[] data = packet.getData();
-                    Header header = Header.fromBytes(data);
-                    int messageType = header.getMessageType();
-
-
-
-                    if(messageType == MessageTypes.DATA.getValue() && Connection.getConnected()) {
-                        byte[] message = new byte[header.getLength()];
-                        System.arraycopy(data, Configurations.HEADER_LENGTH, message, 0, message.length);
-
-                        System.out.println(new String(message));
-                    }
-                }
-                socket.close();
-            } catch(IOException e) {
-                e.printStackTrace();
-            }
-
-        }).start();
+    public Receiver(Connection connection, List<PackageHandler> packageHandlers) {
+        this.connection = connection;
+        this.packageHandlers = packageHandlers;
     }
 
-    public static boolean isCorrupted(byte[] packet) {
-        if (packet == null) return false;
+    public void listen() {
+        System.out.println("Listening for incoming packets...");
 
-        Header header = Header.fromBytes(packet);
-        ByteBuffer byteBuffer = ByteBuffer.allocate(Configurations.HEADER_LENGTH - 8 + packet.length);
-        byteBuffer.putInt(header.getMessageType()).putInt(header.getSequenceNumber()).putInt(header.getLength());
+        setIsListening(true);
 
-        byte[] data = new byte[header.getLength()];
-        System.arraycopy(packet, 0, data, 0, data.length);
-        byteBuffer.put(data);
+        setListenerThread(new Thread(() -> {
+            while(getIsListening()) {
+                byte[] buffer = new byte[Configurations.MAX_PACKET_SIZE];
+                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 
-        return header.getChecksum() == Checksum.calculateChecksum(byteBuffer.array());
+                connection.getSocket().receive(packet);
+
+                if(connection.getConnected() && (!packet.getAddress().equals(connection.getAddress()) || packet.getPort() != connection.getPort())) {
+                    System.out.println("Received a packet from an unknown source. Ignoring...");
+                    continue;
+                }
+
+                byte[] data = packet.getData();
+                Header header = Header.fromBytes(data);
+                ByteBuffer byteBuffer = ByteBuffer.allocate(header.getLength() + Configurations.HEADER_LENGTH_WITHOUT_CHECKSUM);
+                byteBuffer.put(header.toBytesForChecksum()).put(data, Configurations.HEADER_LENGTH, header.getLength());
+
+                if(Checksum.checkChecksum(byteBuffer.array(), header.getChecksum())) {
+                    System.out.println("Received a corrupted packet. Ignoring...");
+                    continue;
+                }
+
+                MessageType messageType = Objects.requireNonNull(MessageType.fromInt(header.getMessageType()));
+                if (connection.getConnected()) {
+                    switch (messageType) {
+                        case KEEP_ALIVE, DATA -> packageHandlers.forEach(handler -> handler.receivePackage(header, packet));
+                        default -> {}
+                    }
+                } else {
+                    switch (messageType) {
+                        case SYN, SYN_ACK, ACK -> packageHandlers.forEach(handler -> handler.receivePackage(header, packet));
+
+                        default -> System.out.println("Received an unexpected message type. Ignoring...");
+                    }
+                }
+            }
+        }));
+
+        getListenerThread().start();
+    }
+
+    public void stop() {
+        setIsListening(false);
+        getListenerThread().interrupt();
+    }
+
+    private synchronized void setListenerThread(Thread listenerThread) {
+        this.listenerThread = listenerThread;
+    }
+
+    private synchronized Thread getListenerThread() {
+        return listenerThread;
+    }
+
+    private synchronized void setIsListening(boolean isListening) {
+        this.isListening = isListening;
+    }
+
+    private synchronized boolean getIsListening() {
+        return isListening;
     }
 }

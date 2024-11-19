@@ -1,8 +1,6 @@
-import proguard.gradle.ProGuardTask
-
 plugins {
-    id("java")
-    kotlin("jvm")
+    alias(libs.plugins.java)
+    alias(libs.plugins.org.jetbrains.kotlin.jvm)
 }
 
 group = "com.pks.p2p"
@@ -13,10 +11,9 @@ repositories {
 }
 
 dependencies {
-    testImplementation(platform("org.junit:junit-bom:5.10.0"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    implementation(kotlin("stdlib-jdk8"))
-    implementation("com.guardsquare:proguard-gradle:7.6.0")
+    testImplementation(platform(libs.org.junit.junit.bom))
+    testImplementation(libs.org.junit.jupiter.junit.jupiter)
+    implementation(libs.kotlin.stdlib.jdk8)
 }
 
 
@@ -25,7 +22,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.guardsquare:proguard-gradle:7.6.0")
+        classpath(libs.com.guardsquare.proguard.gradle)
     }
 }
 
@@ -33,13 +30,11 @@ tasks.test {
     useJUnitPlatform()
 }
 
-tasks.build {
-    dependsOn.add(tasks.getByName("proguard"))
-}
-
-tasks.register("proguard", ProGuardTask::class) {
-    group = "build"
-    configuration(File("proguard.pro"))
+tasks.register("proguard", proguard.gradle.ProGuardTask::class) {
+    description = "Runs ProGuard to obfuscate and optimize the JAR file"
+    configuration("proguard.pro")
+    dependsOn(tasks.jar)
+    outputs.upToDateWhen { false }
 }
 
 tasks.jar {
@@ -47,6 +42,7 @@ tasks.jar {
     manifest {
         attributes["Main-Class"] = "com.pks.p2p.Main"
     }
+    finalizedBy("proguard")
 }
 
 kotlin {
