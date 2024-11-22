@@ -35,29 +35,37 @@ public class Main {
         p2pManager.start();
 
         System.out.println("\nEnter the IP address of the peer:");
-        String destinationAddress = UserInputUtil.getUserValue(System.in, StringConstants.IP_PATTERN.getValue(), "Invalid IP format. Try again: ", () -> !p2pManager.isConnected());
+        String destinationAddress = UserInputUtil.getUserValue(System.in, StringConstants.IP_PATTERN.getValue(),
+                "Invalid IP format. Try again: ",
+                () -> !p2pManager.isConnected());
+
         System.out.println("Enter the port number of the peer:");
-        String destinationPort = UserInputUtil.getUserValue(System.in, StringConstants.PORT_PATTERN.getValue(), "Invalid port format. Try again: ", () -> !p2pManager.isConnected());
+        String destinationPort = UserInputUtil.getUserValue(System.in, StringConstants.PORT_PATTERN.getValue(),
+                "Invalid port format. Try again: ",
+                () -> !p2pManager.isConnected());
 
         if(destinationPort != null && destinationAddress != null) {
             p2pManager.connect(InetAddress.getByName(destinationAddress), Integer.parseInt(destinationPort));
         }
 
         while(p2pManager.isConnected()) {
-            System.out.println("\nEnter a message to send to the peer, ':ip!' to output your ip or':exit!' to close the program.");
-            String line = InputReaderUtil.readInput(System.in, () -> true);
-            if (":exit!".equals(line)) {
-                break;
+            System.out.println("\nEnter a message to send to the peer, ':ip!' to output your ip or ':disconnect!' to close the program.");
+            String line = InputReaderUtil.readInput(System.in, p2pManager::isConnected);
+            if (":disconnect!".equals(line)) {
+                p2pManager.disconnect();
+                continue;
             } else if(":ip!".equals(line)) {
                 System.out.println("Your IP address is: " + IPUtil.getIP());
                 continue;
             }
-            assert line != null;
-//            p2pManager.sendData(MessageType.DATA, line);
+
+            if (line != null) {
+                p2pManager.send(line);
+            }
         }
 
         System.out.println("Closing socket...");
         p2pManager.stop();
-//        connection.getSocket().close();
+        System.out.println("Socket closed.");
     }
 }

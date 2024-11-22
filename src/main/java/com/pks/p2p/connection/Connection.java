@@ -18,7 +18,8 @@ public class Connection {
         this.socket = socket;
     }
 
-    public void connect(@NotNull InetAddress address, int port) {
+
+    public synchronized void connect(@NotNull InetAddress address, int port) {
         setAddress(address);
         setPort(port);
     }
@@ -51,7 +52,9 @@ public class Connection {
         this.connected = connected;
     }
 
-    public void stop() {
+
+    public synchronized void stop() {
+        setConnected(false);
         Objects.requireNonNull(socket).close();
     }
 }

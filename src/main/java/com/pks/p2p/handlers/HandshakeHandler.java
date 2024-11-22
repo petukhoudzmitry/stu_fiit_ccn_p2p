@@ -32,27 +32,29 @@ public class HandshakeHandler implements PackageHandler {
                 if(!connection.getConnected()) {
                     connection.setAddress(packet.getAddress());
                     connection.setPort(packet.getPort());
-                    sender.sendData(MessageType.SYN_ACK, "");
+                    sender.send(MessageType.SYN_ACK, "");
                 }
             }
             case MessageType.SYN_ACK -> {
+                System.out.println("\nYour are connected to " + connection.getAddress() + ":" + connection.getPort());
                 connection.setConnected(true);
                 keepAliveHandler.start();
-                System.out.println("\nYour are connected to " + connection.getAddress() + ":" + connection.getPort());
-                sender.sendData(MessageType.ACK, "");
+                sender.send(MessageType.ACK, "");
+                sender.startSending();
             }
             case MessageType.ACK -> {
-                System.out.println("\nYou are connected to " + connection.getAddress() + ":" + connection.getPort());
                 connection.setConnected(true);
+                System.out.println("\nYou are connected to " + connection.getAddress() + ":" + connection.getPort());
                 keepAliveHandler.start();
+                sender.startSending();
             }
             default -> {}
         }
     }
 
-    public synchronized void performHandshake() {
+    public void performHandshake() {
         long startTime = System.currentTimeMillis();
-        sender.sendData(MessageType.SYN, "");
-        while(System.currentTimeMillis() - startTime < timeout){}
+        sender.send(MessageType.SYN, "");
+        while(System.currentTimeMillis() - startTime < timeout && !connection.getConnected()){}
     }
 }

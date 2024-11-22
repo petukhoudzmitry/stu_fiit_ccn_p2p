@@ -52,16 +52,16 @@ public class Receiver {
                 }
 
                 MessageType messageType = Objects.requireNonNull(MessageType.fromInt(header.getMessageType()));
+
                 if (connection.getConnected()) {
                     switch (messageType) {
-                        case KEEP_ALIVE, DATA -> packageHandlers.forEach(handler -> handler.receivePackage(header, packet));
+                        case KEEP_ALIVE, FIN, FIN_ACK, MSG -> packageHandlers.forEach(handler -> handler.receivePackage(header, packet));
                         default -> {}
                     }
                 } else {
                     switch (messageType) {
                         case SYN, SYN_ACK, ACK -> packageHandlers.forEach(handler -> handler.receivePackage(header, packet));
-
-                        default -> System.out.println("Received an unexpected message type. Ignoring...");
+                        default -> {}
                     }
                 }
             }

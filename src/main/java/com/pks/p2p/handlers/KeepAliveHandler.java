@@ -42,13 +42,14 @@ public class KeepAliveHandler implements PackageHandler {
     }
 
     private void sendKeepAlive() {
-        sender.sendData(MessageType.KEEP_ALIVE, "");
+        sender.send(MessageType.KEEP_ALIVE, "");
 
     }
 
     private void checkTimeout() {
         if (System.currentTimeMillis() - lastReceived > timeout) {
             System.out.println("Connection timed out.");
+            stop();
         }
     }
 
@@ -57,6 +58,7 @@ public class KeepAliveHandler implements PackageHandler {
     }
 
     public void stop() {
+        connection.setConnected(false);
         executorService.shutdown();
     }
 }

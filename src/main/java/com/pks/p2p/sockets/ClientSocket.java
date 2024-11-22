@@ -26,16 +26,14 @@ public class ClientSocket {
         }
     }
 
-    public synchronized void close() {
+    public void close() {
         socket.close();
     }
 
-    public synchronized void receive(DatagramPacket packet) {
+    public void receive(DatagramPacket packet) {
         try{
             socket.receive(packet);
-        } catch (IOException e) {
-            System.out.println(e.getMessage());
-        }
+        } catch (IOException ignore) {}
     }
 
     public synchronized int getPort() {
@@ -45,8 +43,6 @@ public class ClientSocket {
     public void send(DatagramPacket packet) {
         try {
             socket.send(packet);
-        } catch (IOException e) {
-            System.out.println(e.getMessage());
-        }
+        } catch (IOException ignore) {}
     }
 }

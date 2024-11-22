@@ -5,7 +5,11 @@ public enum MessageType {
     SYN_ACK(1),
     ACK(2),
     DATA(3),
-    KEEP_ALIVE(4);
+    KEEP_ALIVE(4),
+    FIN(5),
+    FIN_ACK(6),
+    MSG(7),
+    FILE(8);
 
     private final int value;
 

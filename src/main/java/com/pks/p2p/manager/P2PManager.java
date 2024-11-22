@@ -4,9 +4,11 @@ import com.pks.p2p.communication.Receiver;
 import com.pks.p2p.communication.Sender;
 import com.pks.p2p.configs.Configurations;
 import com.pks.p2p.connection.Connection;
+import com.pks.p2p.enums.MessageType;
+import com.pks.p2p.handlers.FinHandler;
 import com.pks.p2p.handlers.HandshakeHandler;
 import com.pks.p2p.handlers.KeepAliveHandler;
-import com.pks.p2p.handlers.PackageHandler;
+import com.pks.p2p.handlers.MsgHandler;
 import com.pks.p2p.sockets.ClientSocket;
 
 import java.net.InetAddress;
@@ -25,11 +27,22 @@ public class P2PManager {
         this.sender = new Sender(connection);
         this.keepAliveHandler = new KeepAliveHandler(connection, sender, Configurations.CONNECTION_TIMEOUT, Configurations.KEEP_ALIVE_INTERVAL);
         this.handshakeHandler = new HandshakeHandler(connection, sender, keepAliveHandler, Configurations.CONNECTION_TIMEOUT);
-        this.receiver = new Receiver(connection, List.of(handshakeHandler, keepAliveHandler));
+        FinHandler finHandler = new FinHandler(connection, sender);
+        MsgHandler msgHandler = new MsgHandler(connection);
+        this.receiver = new Receiver(connection, List.of(handshakeHandler, keepAliveHandler, finHandler, msgHandler));
     }
 
+    public void send(String data) {
+        if (data != null && !data.isEmpty()) {
+            if (data.startsWith("file:")) {
+                sender.send(MessageType.FILE, data);
+            } else {
+                sender.send(MessageType.MSG, data);
+            }
+        }
+    }
 
-    public int getPort() {
+    public synchronized int getPort() {
         return connection.getSocket().getPort();
     }
 
@@ -37,18 +50,23 @@ public class P2PManager {
         receiver.listen();
     }
 
-    public void connect(InetAddress address, int port) {
+    public synchronized void connect(InetAddress address, int port) {
         connection.connect(address, port);
         handshakeHandler.performHandshake();
     }
 
-    public boolean isConnected() {
+    public synchronized void disconnect() {
+        while (sender.isSending());
+        sender.send(MessageType.FIN, "");
+    }
+
+    public synchronized boolean isConnected() {
         return connection.getConnected();
     }
 
-    public void stop() {
-        receiver.stop();
+    public synchronized void stop() {
         connection.stop();
+        receiver.stop();
         keepAliveHandler.stop();
     }
 }
