@@ -1,51 +1,61 @@
 package com.pks.p2p.sockets;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.SocketException;
+import java.net.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
 
 
 public class ClientSocket {
 
-    private volatile DatagramSocket socket = null;
+    private volatile DatagramChannel channel = null;
 
     public ClientSocket(int port) {
-        setSocket(port);
+        setChannel(port);
     }
 
-    public synchronized DatagramSocket getSocket() {
-        return socket;
+    public synchronized DatagramChannel getChannel() {
+        return channel;
     }
 
-    private synchronized void setSocket(int port) {
+    private synchronized void setChannel(int port) {
         try {
-            this.socket = new DatagramSocket(port);
-            this.socket.setSoTimeout(0);
-            this.socket.setReceiveBufferSize(Integer.MAX_VALUE);
-            this.socket.setSendBufferSize(Integer.MAX_VALUE);
-        } catch (SocketException e) {
+            channel = DatagramChannel.open();
+            channel.configureBlocking(false);
+            channel.bind(new InetSocketAddress(port));
+        } catch (IOException e) {
             System.out.println(e.getMessage());
         }
     }
 
     public void close() {
-        socket.close();
+        try {
+            channel.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public void receive(DatagramPacket packet) {
+    public SocketAddress receive(ByteBuffer buffer) {
         try{
-            socket.receive(packet);
+            return channel.receive(buffer);
         } catch (IOException ignore) {}
+        return null;
     }
 
     public synchronized int getPort() {
-        return socket.getLocalPort();
+        return channel.socket().getLocalPort();
     }
 
-    public void send(DatagramPacket packet) {
+    public void connect(InetAddress address, int port) {
         try {
-            socket.send(packet);
+            channel.connect(new InetSocketAddress(address, port));
+        } catch (IOException ignore) {}
+    }
+
+    public void send(ByteBuffer buffer, InetSocketAddress address) {
+        try {
+            channel.send(buffer, address);
         } catch (IOException ignore) {}
     }
 }

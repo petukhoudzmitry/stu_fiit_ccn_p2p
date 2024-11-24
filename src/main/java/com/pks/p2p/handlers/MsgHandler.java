@@ -28,13 +28,7 @@ public class MsgHandler implements PackageHandler {
     @Override
     public void receivePackage(@NotNull Header header, @NotNull DatagramPacket packet) {
 
-
         if (header != null && header.getMessageType() == MessageType.MSG.getValue() && packet != null) {
-            if (!isRunning()) {
-                setRunning(true);
-                run();
-            }
-
             byte[] data = packet.getData();
             byte[] dataHeaderBytes = new byte[Configurations.DATA_HEADER_LENGTH];
 
@@ -55,31 +49,33 @@ public class MsgHandler implements PackageHandler {
 
             value.getSecond()[dataHeader.getPackageNumber()] = message;
             messages.put(dataHeader.getId(), value);
+
+            run();
         }
     }
 
     private void run() {
         new Thread(() -> {
-            while (isRunning() && connection.getConnected()) {
-                messages.forEach((key, value) -> {
-                    int i = 0;
-                    for(; i < value.getSecond().length; i++) {
-                        if (value.getSecond()[i] == null) {
-                            break;
-                        }
+            messages.forEach((key, value) -> {
+                int i = 0;
+                for (; i < value.getSecond().length; i++) {
+                    if (value.getSecond()[i] == null) {
+                        break;
                     }
-                    if (value.getFirst() == i) {
+                }
 
-                        StringBuilder message = new StringBuilder("Received a message: ");
+                if (value.getFirst() == i) {
+                    StringBuilder message = new StringBuilder("Received a message: ");
 
-                        for (byte[] data : value.getSecond()) {
-                            message.append(new String(data));
-                        }
-
-                        messages.remove(key);
+                    for (byte[] data : value.getSecond()) {
+                        message.append(new String(data));
                     }
-                });
-            }
+
+                    System.out.println(message);
+
+                    messages.remove(key);
+                }
+            });
         }).start();
     }
 

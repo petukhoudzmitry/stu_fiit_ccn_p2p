@@ -27,7 +27,7 @@ public class P2PManager {
         FinHandler finHandler = new FinHandler(connection, sender);
         MsgHandler msgHandler = new MsgHandler(connection);
         FileHandler fileHandler = new FileHandler(connection);
-        this.receiver = new Receiver(connection, List.of(handshakeHandler, keepAliveHandler, finHandler, msgHandler, fileHandler));
+        this.receiver = new Receiver(connection, sender, List.of(handshakeHandler, keepAliveHandler, finHandler, msgHandler, fileHandler));
     }
 
     public void send(String data) {

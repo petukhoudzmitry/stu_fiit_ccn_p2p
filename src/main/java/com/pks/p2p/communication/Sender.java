@@ -6,15 +6,17 @@ import com.pks.p2p.enums.MessageType;
 import com.pks.p2p.protocol.DataHeader;
 import com.pks.p2p.protocol.Header;
 import com.pks.p2p.util.ByteArrayUtil;
+import kotlin.Pair;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
-import java.net.DatagramPacket;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -22,16 +24,15 @@ import java.util.concurrent.atomic.AtomicLong;
 public class Sender {
 
     private final Connection connection;
-
     private final AtomicInteger atomicInteger = new AtomicInteger(0);
     private final AtomicLong atomicLong = new AtomicLong(0L);
 
     private final ConcurrentLinkedQueue<byte[]> messages = new ConcurrentLinkedQueue<>();
+    private final ConcurrentHashMap<Integer, Pair<Long, byte[]>> unconfirmedPackages = new ConcurrentHashMap<>();
 
     public Sender(Connection connection) {
         this.connection = connection;
     }
-
 
     public void startSending() {
         new Thread(() -> {
@@ -42,19 +43,26 @@ public class Sender {
                 }
             }
         }).start();
+        runArq();
     }
 
-    private void send(@NotNull byte[] data) {
+    public void send(@NotNull byte[] data) {
         if (data != null) {
-            connection.getSocket().send(new DatagramPacket(data, data.length, connection.getAddress(), connection.getPort()));
-            try {
-                Thread.sleep(5);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+            ByteBuffer buffer = ByteBuffer.wrap(data);
+            connection.getSocket().send(buffer, new InetSocketAddress(connection.getAddress(), connection.getPort()));
         }
     }
 
+    private void addUnconfirmedPackage(@NotNull byte[] data) {
+        if (data != null && data.length >= Configurations.HEADER_LENGTH) {
+            Header header = Header.fromBytes(data);
+            unconfirmedPackages.put(header.getSequenceNumber(), new Pair<>(System.currentTimeMillis(), data));
+        }
+    }
+
+    public void confirmPackage(int sequenceNumber) {
+        unconfirmedPackages.remove(sequenceNumber);
+    }
 
     public void send(@NotNull MessageType messageType, @NotNull String data) {
         if (data == null) {
@@ -137,6 +145,7 @@ public class Sender {
                         byte[] message = bb.array();
 
                         messages.add(message);
+                        addUnconfirmedPackage(message);
                     }
                 } catch (IOException e) {
                     System.out.println("File '" + file.getPath() + "' not found.");
@@ -186,6 +195,7 @@ public class Sender {
                     byte[] message = bb.array();
 
                     messages.add(message);
+                    addUnconfirmedPackage(message);
                 }
             }
         }).start();
@@ -193,5 +203,17 @@ public class Sender {
 
     public synchronized boolean isSending() {
         return !messages.isEmpty();
+    }
+
+    private void runArq() {
+        new Thread(() -> {
+            while (connection.getConnected()) {
+                unconfirmedPackages.forEach((key, value) -> {
+                    if (System.currentTimeMillis() - value.getFirst() > Configurations.ARQ_TIMEOUT) {
+                        send(value.getSecond());
+                    }
+                });
+            }
+        }).start();
     }
 }

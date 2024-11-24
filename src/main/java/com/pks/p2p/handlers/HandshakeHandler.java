@@ -25,6 +25,10 @@ public class HandshakeHandler implements PackageHandler {
 
     @Override
     public void receivePackage(@NotNull Header header, @NotNull DatagramPacket packet) {
+        if (connection.getConnected()) {
+            return;
+        }
+
         MessageType messageType = MessageType.fromInt(header.getMessageType());
 
         switch(Objects.requireNonNull(messageType)) {

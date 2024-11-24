@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.java)
     alias(libs.plugins.org.jetbrains.kotlin.jvm)
 }
-
 group = "com.pks.p2p"
 version = "1.0-SNAPSHOT"
 
@@ -16,14 +15,15 @@ dependencies {
     implementation(libs.kotlin.stdlib.jdk8)
 }
 
-
 buildscript {
     repositories {
         mavenCentral()
     }
+
     dependencies {
         classpath(libs.com.guardsquare.proguard.gradle)
     }
+
 }
 
 tasks.test {

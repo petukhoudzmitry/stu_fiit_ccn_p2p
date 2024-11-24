@@ -20,6 +20,7 @@ public class Connection {
 
 
     public synchronized void connect(@NotNull InetAddress address, int port) {
+        socket.connect(address, port);
         setAddress(address);
         setPort(port);
     }
