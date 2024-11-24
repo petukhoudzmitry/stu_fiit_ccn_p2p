@@ -9,13 +9,11 @@ public class DataHeader {
     private final long id;
     private final int totalPackages;
     private final int packageNumber;
-    private final byte[] name;
 
-    public DataHeader(long id, int totalPackages, int packageNumber, byte[] name) {
+    public DataHeader(long id, int totalPackages, int packageNumber) {
         this.id = id;
         this.totalPackages = totalPackages;
         this.packageNumber = packageNumber;
-        this.name = name;
     }
 
     public long getId() {
@@ -30,13 +28,10 @@ public class DataHeader {
         return packageNumber;
     }
 
-    public byte[] getName() {
-        return name;
-    }
 
     public byte[] toBytes() {
-        ByteBuffer buffer = ByteBuffer.allocate(Configurations.DATA_HEADER_LENGTH + name.length);
-        buffer.putLong(id).putInt(totalPackages).putInt(packageNumber).put(name);
+        ByteBuffer buffer = ByteBuffer.allocate(Configurations.DATA_HEADER_LENGTH);
+        buffer.putLong(id).putInt(totalPackages).putInt(packageNumber);
 
         return buffer.array();
     }
@@ -46,9 +41,16 @@ public class DataHeader {
         long id = buffer.getLong();
         int totalPackages = buffer.getInt();
         int packageNumber = buffer.getInt();
-        byte[] name = new byte[bytes.length - Configurations.DATA_HEADER_LENGTH];
-        buffer.get(name);
 
-        return new DataHeader(id, totalPackages, packageNumber, name);
+        return new DataHeader(id, totalPackages, packageNumber);
+    }
+
+    @Override
+    public String toString() {
+        return "DataHeader{" +
+                "id=" + id +
+                ", totalPackages=" + totalPackages +
+                ", packageNumber=" + packageNumber +
+                '}';
     }
 }

@@ -21,6 +21,9 @@ public class ClientSocket {
     private synchronized void setSocket(int port) {
         try {
             this.socket = new DatagramSocket(port);
+            this.socket.setSoTimeout(0);
+            this.socket.setReceiveBufferSize(Integer.MAX_VALUE);
+            this.socket.setSendBufferSize(Integer.MAX_VALUE);
         } catch (SocketException e) {
             System.out.println(e.getMessage());
         }

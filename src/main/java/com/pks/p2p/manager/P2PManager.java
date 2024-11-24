@@ -5,10 +5,7 @@ import com.pks.p2p.communication.Sender;
 import com.pks.p2p.configs.Configurations;
 import com.pks.p2p.connection.Connection;
 import com.pks.p2p.enums.MessageType;
-import com.pks.p2p.handlers.FinHandler;
-import com.pks.p2p.handlers.HandshakeHandler;
-import com.pks.p2p.handlers.KeepAliveHandler;
-import com.pks.p2p.handlers.MsgHandler;
+import com.pks.p2p.handlers.*;
 import com.pks.p2p.sockets.ClientSocket;
 
 import java.net.InetAddress;
@@ -29,7 +26,8 @@ public class P2PManager {
         this.handshakeHandler = new HandshakeHandler(connection, sender, keepAliveHandler, Configurations.CONNECTION_TIMEOUT);
         FinHandler finHandler = new FinHandler(connection, sender);
         MsgHandler msgHandler = new MsgHandler(connection);
-        this.receiver = new Receiver(connection, List.of(handshakeHandler, keepAliveHandler, finHandler, msgHandler));
+        FileHandler fileHandler = new FileHandler(connection);
+        this.receiver = new Receiver(connection, List.of(handshakeHandler, keepAliveHandler, finHandler, msgHandler, fileHandler));
     }
 
     public void send(String data) {

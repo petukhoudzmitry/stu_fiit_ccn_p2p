@@ -19,6 +19,7 @@ public class Receiver {
     private volatile Thread listenerThread = null;
     private volatile boolean isListening = false;
 
+
     public Receiver(Connection connection, List<PackageHandler> packageHandlers) {
         this.connection = connection;
         this.packageHandlers = packageHandlers;
@@ -55,7 +56,7 @@ public class Receiver {
 
                 if (connection.getConnected()) {
                     switch (messageType) {
-                        case KEEP_ALIVE, FIN, FIN_ACK, MSG -> packageHandlers.forEach(handler -> handler.receivePackage(header, packet));
+                        case KEEP_ALIVE, FIN, FIN_ACK, MSG, FILE -> packageHandlers.forEach(handler -> handler.receivePackage(header, packet));
                         default -> {}
                     }
                 } else {

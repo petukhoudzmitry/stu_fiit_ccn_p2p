@@ -43,8 +43,8 @@ public class HandshakeHandler implements PackageHandler {
                 sender.startSending();
             }
             case MessageType.ACK -> {
-                connection.setConnected(true);
                 System.out.println("\nYou are connected to " + connection.getAddress() + ":" + connection.getPort());
+                connection.setConnected(true);
                 keepAliveHandler.start();
                 sender.startSending();
             }

@@ -9,15 +9,13 @@ import kotlin.Pair;
 import org.jetbrains.annotations.NotNull;
 
 import java.net.DatagramPacket;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class MsgHandler implements PackageHandler {
 
     private final Connection connection;
 
-    private final ConcurrentHashMap<Long, Pair<Integer, List<byte[]>>> messages = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, Pair<Integer, byte[][]>> messages = new ConcurrentHashMap<>();
     private volatile boolean isRunning = false;
 
 
@@ -29,11 +27,14 @@ public class MsgHandler implements PackageHandler {
 
     @Override
     public void receivePackage(@NotNull Header header, @NotNull DatagramPacket packet) {
+
+
         if (header != null && header.getMessageType() == MessageType.MSG.getValue() && packet != null) {
             if (!isRunning()) {
                 setRunning(true);
                 run();
             }
+
             byte[] data = packet.getData();
             byte[] dataHeaderBytes = new byte[Configurations.DATA_HEADER_LENGTH];
 
@@ -45,14 +46,14 @@ public class MsgHandler implements PackageHandler {
 
             System.arraycopy(data, Configurations.HEADER_LENGTH + Configurations.DATA_HEADER_LENGTH, message, 0, message.length);
 
-            Pair<Integer, List<byte[]>> value = messages.getOrDefault(dataHeader.getId(),
+            Pair<Integer, byte[][]> value = messages.getOrDefault(dataHeader.getId(),
                     new Pair<>(
                             dataHeader.getTotalPackages(),
-                            new ArrayList<>(dataHeader.getTotalPackages())
+                            new byte[dataHeader.getTotalPackages()][]
                     )
             );
 
-            value.getSecond().add(dataHeader.getPackageNumber(), message);
+            value.getSecond()[dataHeader.getPackageNumber()] = message;
             messages.put(dataHeader.getId(), value);
         }
     }
@@ -61,10 +62,19 @@ public class MsgHandler implements PackageHandler {
         new Thread(() -> {
             while (isRunning() && connection.getConnected()) {
                 messages.forEach((key, value) -> {
-                    if (value.getFirst() == value.getSecond().size()) {
+                    int i = 0;
+                    for(; i < value.getSecond().length; i++) {
+                        if (value.getSecond()[i] == null) {
+                            break;
+                        }
+                    }
+                    if (value.getFirst() == i) {
+
                         StringBuilder message = new StringBuilder("Received a message: ");
-                        value.getSecond().forEach(data -> message.append(new String(data)));
-                        System.out.println(message);
+
+                        for (byte[] data : value.getSecond()) {
+                            message.append(new String(data));
+                        }
 
                         messages.remove(key);
                     }
