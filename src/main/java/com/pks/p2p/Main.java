@@ -60,7 +60,7 @@ public class Main {
                     
                     Enter a message to send to the peer, 'file:[filepath]' to send file to the peer, ':ip!' to output your ip, ':disconnect!' to disconnect and close the program,\
                     
-                    ':fragment! to set the fragment size, or ':corrupted!' to simulate transmission of the corrupted data:
+                    ':fragment! to set the fragment size, ':path!' to set the path for saving files, or ':corrupted!' to simulate transmission of the corrupted data:
                     """);
 
             String line = InputReaderUtil.readInput(System.in, p2pManager::isConnected);
@@ -86,6 +86,16 @@ public class Main {
 
                 if (line != null) {
                     p2pManager.send(line, true);
+                }
+
+                continue;
+            } else if (":path!".equals(line)) {
+                System.out.println("Enter the path for saving files:");
+                String path = InputReaderUtil.readInput(System.in, p2pManager::isConnected);
+
+                while (path != null && !Configurations.setDownloadPath(path)) {
+                    System.out.println("Invalid path. Try again:");
+                    path = InputReaderUtil.readInput(System.in, p2pManager::isConnected);
                 }
 
                 continue;

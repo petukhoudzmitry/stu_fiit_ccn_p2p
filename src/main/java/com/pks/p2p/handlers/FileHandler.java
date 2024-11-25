@@ -9,6 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.*;
 import java.net.DatagramPacket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -56,6 +57,13 @@ public class FileHandler implements PackageHandler {
 
     @NotNull
     private static String getUniqueFileName(String fileName) {
+        File directory = new File(Configurations.getDownloadPath());
+
+        if (!directory.exists()) {
+            directory.mkdirs();
+        }
+
+        fileName = Paths.get(Configurations.getDownloadPath(), fileName).toString();
         File file = new File(fileName);
 
         // If the file already exists, we need to modify the name
