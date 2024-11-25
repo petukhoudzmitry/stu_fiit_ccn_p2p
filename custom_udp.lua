@@ -9,7 +9,8 @@ local message_types = {
     [5] = "FIN",
     [6] = "FIN-ACK",
     [7] = "MSG",
-    [8] = "DATA"
+    [8] = "DATA",
+    [9] = "NACK"
 }
 
 local message_type = ProtoField.uint32("custom_udp.message_type", "Message Type", base.DEC, message_types)
