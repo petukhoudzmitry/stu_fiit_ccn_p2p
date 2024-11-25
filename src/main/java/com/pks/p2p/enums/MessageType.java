@@ -9,7 +9,8 @@ public enum MessageType {
     FIN(5),
     FIN_ACK(6),
     MSG(7),
-    FILE(8);
+    FILE(8),
+    NACK(9);
 
     private final int value;
 

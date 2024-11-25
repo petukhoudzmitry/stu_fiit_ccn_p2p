@@ -1,7 +1,6 @@
 package com.pks.p2p.handlers;
 
 import com.pks.p2p.configs.Configurations;
-import com.pks.p2p.connection.Connection;
 import com.pks.p2p.enums.MessageType;
 import com.pks.p2p.protocol.DataHeader;
 import com.pks.p2p.protocol.Header;
@@ -14,18 +13,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class FileHandler implements PackageHandler {
-
-    private final Connection connection;
-
     private final ConcurrentHashMap<Long, byte[][]> messages = new ConcurrentHashMap<>();
-    private volatile boolean isRunning = false;
-
-
-    public FileHandler(Connection connection) {
-        this.connection = connection;
-    }
+    private final ConcurrentHashMap<Long, Long> firstPackageTimes = new ConcurrentHashMap<>();
+    private final ConcurrentLinkedQueue<Long> receivedFiles = new ConcurrentLinkedQueue<>();
 
 
     @Override
@@ -42,9 +35,17 @@ public class FileHandler implements PackageHandler {
 
             System.arraycopy(data, Configurations.HEADER_LENGTH + Configurations.DATA_HEADER_LENGTH, message, 0, message.length);
 
-            byte[][] value = messages.getOrDefault(dataHeader.getId(),
-                    new byte[dataHeader.getTotalPackages()][]
-            );
+            byte[][] value = messages.get(dataHeader.getId());
+
+            if (value == null) {
+                if (receivedFiles.contains(dataHeader.getId())) {
+                    return;
+                }
+                value = new byte[dataHeader.getTotalPackages()][];
+                firstPackageTimes.put(dataHeader.getId(), System.currentTimeMillis());
+            }
+
+            System.out.println("Received a fragment with sequence number " + header.getSequenceNumber());
 
             value[dataHeader.getPackageNumber()] = message;
 
@@ -97,20 +98,22 @@ public class FileHandler implements PackageHandler {
             }
 
             if (i == value.length) {
+                long end = System.currentTimeMillis();
+
                 String fileName = extractFileName(value);
                 fileName = getUniqueFileName(fileName);
 
                 File file = new File(fileName);
-
                 value = removeFileName(value);
 
                 try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
                     for (byte[] bytes : value) {
                         fileOutputStream.write(bytes);
                     }
-                    System.out.println("Received a file: " + fileName);
+                    System.out.println("\nReceived a file: " + file.getAbsoluteFile() + " of size " + file.length() + String.format(" bytes. Transfer time: %.2f s.", ((end - firstPackageTimes.get(key)) / 1000.0)));
                     messages.remove(key);
-
+                    firstPackageTimes.remove(key);
+                    receivedFiles.add(key);
                 } catch (Exception ignore) {}
             }
         });
@@ -165,12 +168,7 @@ public class FileHandler implements PackageHandler {
         return fileName.toString();
     }
 
-
-    private synchronized boolean isRunning() {
-        return isRunning;
-    }
-
-    private synchronized void setRunning(boolean running) {
-        isRunning = running;
+    public boolean hasUnreceivedFiles() {
+        return !messages.isEmpty();
     }
 }

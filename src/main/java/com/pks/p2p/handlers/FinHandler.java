@@ -22,7 +22,7 @@ public class FinHandler implements PackageHandler {
     public void receivePackage(@NotNull Header header, @NotNull DatagramPacket packet) {
         if (header.getMessageType() == MessageType.FIN.getValue()) {
             while (sender.isSending());
-            sender.send(MessageType.FIN_ACK, "");
+            sender.send(MessageType.FIN_ACK, "", false);
             while(sender.isSending());
             connection.setConnected(false);
         } else if (header.getMessageType() == MessageType.FIN_ACK.getValue()) {

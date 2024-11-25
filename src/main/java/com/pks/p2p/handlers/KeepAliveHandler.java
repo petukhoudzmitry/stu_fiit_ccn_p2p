@@ -17,14 +17,18 @@ public class KeepAliveHandler implements PackageHandler {
 
     private final Connection connection;
     private final Sender sender;
+    private final FileHandler fileHandler;
+    private final MsgHandler msgHandler;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private final long timeout;
     private final long interval;
     private long lastReceived = System.currentTimeMillis();
 
-    public KeepAliveHandler(Connection connection, Sender sender, long timeout, long interval) {
+    public KeepAliveHandler(Connection connection, Sender sender, FileHandler fileHandler, MsgHandler msgHandler, long timeout, long interval) {
         this.connection = connection;
         this.sender = sender;
+        this.fileHandler = fileHandler;
+        this.msgHandler = msgHandler;
         this.timeout = timeout;
         this.interval = interval;
     }
@@ -42,13 +46,19 @@ public class KeepAliveHandler implements PackageHandler {
     }
 
     private void sendKeepAlive() {
-        sender.send(MessageType.KEEP_ALIVE, "");
+        sender.send(MessageType.KEEP_ALIVE, "", false);
 
     }
 
     private void checkTimeout() {
         if (System.currentTimeMillis() - lastReceived > timeout) {
-            System.out.println("Connection timed out.");
+            System.out.println("\nConnection timed out.");
+            if (fileHandler.hasUnreceivedFiles()) {
+                System.out.println("There are unreceived files.");
+            }
+            if (msgHandler.hasUnreceivedMessages()) {
+                System.out.println("There are unreceived messages.");
+            }
             stop();
         }
     }

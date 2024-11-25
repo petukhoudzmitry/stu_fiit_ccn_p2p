@@ -15,6 +15,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -27,7 +28,7 @@ public class Sender {
     private final AtomicInteger atomicInteger = new AtomicInteger(0);
     private final AtomicLong atomicLong = new AtomicLong(0L);
 
-    private final ConcurrentLinkedQueue<byte[]> messages = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<Pair<Boolean, byte[]>> messages = new ConcurrentLinkedQueue<>();
     private final ConcurrentHashMap<Integer, Pair<Long, byte[]>> unconfirmedPackages = new ConcurrentHashMap<>();
 
     public Sender(Connection connection) {
@@ -37,9 +38,23 @@ public class Sender {
     public void startSending() {
         new Thread(() -> {
             while (connection.getConnected()) {
-                if (!messages.isEmpty()) {
-                    byte[] message = messages.poll();
-                    send(message);
+                if (!messages.isEmpty() && unconfirmedPackages.size() <= Configurations.WINDOW_SIZE) {
+                    Pair<Boolean, byte[]> pair = messages.poll();
+                    byte[] message = pair.getSecond();
+
+                    if (pair.getFirst()) {
+                        byte[] corruptedMessage = new byte[message.length];
+                        System.arraycopy(message, 0, corruptedMessage, 0, message.length);
+                        corruptedMessage[Configurations.HEADER_LENGTH + 1] = (byte) (corruptedMessage[Configurations.HEADER_LENGTH + 1] + 1);
+                        send(corruptedMessage);
+                    } else {
+                        send(message);
+                    }
+
+                    MessageType messageType = MessageType.fromInt(Header.fromBytes(message).getMessageType());
+                    if (messageType == MessageType.MSG || messageType == MessageType.FILE) {
+                        addUnconfirmedPackage(message);
+                    }
                 }
             }
         }).start();
@@ -64,19 +79,26 @@ public class Sender {
         unconfirmedPackages.remove(sequenceNumber);
     }
 
-    public void send(@NotNull MessageType messageType, @NotNull String data) {
+    public void resendMessage(int sequenceNumber) {
+        Pair<Long, byte[]> pair = unconfirmedPackages.get(sequenceNumber);
+        if (pair != null) {
+            send(pair.getSecond());
+        }
+    }
+
+    public void send(@NotNull MessageType messageType, @NotNull String data, boolean corrupted) {
         if (data == null) {
             return;
         }
 
         if (messageType == MessageType.MSG) {
-            sendMessage(messageType, data);
+            sendMessage(messageType, data, corrupted);
             return;
         } else if (messageType == MessageType.FILE){
-            sendFile(messageType, data);
+            sendFile(messageType, data, corrupted);
             return;
         } else if (messageType == MessageType.FIN_ACK) {
-            messages.add(new Header(messageType.getValue(), atomicInteger.getAndIncrement(), 0, new byte[0]).toBytes());
+            messages.add(new Pair<>(corrupted, new Header(messageType.getValue(), atomicInteger.getAndIncrement(), 0, new byte[0]).toBytes()));
             return;
         }
 
@@ -91,27 +113,35 @@ public class Sender {
 
             switch (messageType) {
                 case SYN, SYN_ACK, ACK, KEEP_ALIVE -> send(message);
-                default -> messages.add(message);
+                default -> messages.add(new Pair<>(corrupted, message));
             }
         }).start();
     }
 
+    private void sendFile(@NotNull MessageType messageType, @NotNull String data, boolean corrupted) {
+        if (data == null || data.isEmpty()) {
+            return;
+        }
 
-    private void sendFile(@NotNull MessageType messageType, @NotNull String data) {
-        new Thread(() -> {
-            if (data == null || data.isEmpty()) {
+        if (messageType == MessageType.FILE){
+            String filePath = data.replace("file:", "");
+            File file = new File(filePath);
+
+            if (!file.exists()) {
+                System.out.println("File '" + file.getPath() + "' not found.");
                 return;
             }
 
-            if (messageType == MessageType.FILE) {
-                String filePath = data.replace("file:", "");
-                File file = new File(filePath);
+            byte[] fileNameBytes = (file.getName() + "\n").getBytes(StandardCharsets.UTF_8);
 
+            long totalBytesToSent = fileNameBytes.length + file.length();
+            int lastChunkSize = (int) (totalBytesToSent % Configurations.MAX_PACKET_SIZE);
+
+            System.out.println("\nSending the file: " + file.getName() + " of size " +  totalBytesToSent + " bytes, with " + (int)Math.ceil(1. * totalBytesToSent / Configurations.MAX_PACKET_SIZE) + " fragments of size " + Configurations.MAX_PACKET_SIZE + " bytes" + (lastChunkSize > 0 ? ", last fragment size is " + lastChunkSize + " bytes" : "."));
+
+            new Thread(() -> {
                 try {
                     byte[] fileBytes = Files.readAllBytes(Paths.get(filePath));
-
-                    // Convert the filename to bytes and append a newline
-                    byte[] fileNameBytes = (file.getName() + "\n").getBytes(StandardCharsets.UTF_8);
 
                     // Combine filename and file content
                     byte[] combined = new byte[fileNameBytes.length + fileBytes.length];
@@ -119,8 +149,9 @@ public class Sender {
                     System.arraycopy(fileBytes, 0, combined, fileNameBytes.length, fileBytes.length);
 
                     List<byte[]> chunks = ByteArrayUtil.chunkByteArray(combined,
-                            Configurations.MAX_PACKET_SIZE - Configurations.HEADER_LENGTH - Configurations.DATA_HEADER_LENGTH
+                            Configurations.MAX_PACKET_SIZE
                     );
+
 
                     long id = atomicLong.getAndIncrement();
 
@@ -128,6 +159,10 @@ public class Sender {
                         byte[] chunk = chunks.get(i);
                         DataHeader dataHeader = new DataHeader(id, chunks.size(), i);
                         byte[] dataHeaderBytes = dataHeader.toBytes();
+
+                        byte[] combinedData = new byte[dataHeaderBytes.length + chunk.length];
+                        System.arraycopy(dataHeaderBytes, 0, combinedData, 0, dataHeaderBytes.length);
+                        System.arraycopy(chunk, 0, combinedData, dataHeaderBytes.length, chunk.length);
 
                         ByteBuffer bb = ByteBuffer.allocate(Configurations.HEADER_LENGTH + Configurations.DATA_HEADER_LENGTH + chunk.length);
                         bb.put(Configurations.HEADER_LENGTH, dataHeaderBytes);
@@ -137,34 +172,37 @@ public class Sender {
                                 messageType.getValue(),
                                 atomicInteger.getAndIncrement(),
                                 Configurations.DATA_HEADER_LENGTH + chunk.length,
-                                chunk
+                                combinedData
                         ).toBytes();
 
                         bb.put(headerBytes);
 
                         byte[] message = bb.array();
 
-                        messages.add(message);
-                        addUnconfirmedPackage(message);
+                        messages.add(new Pair<>(corrupted, message));
                     }
                 } catch (IOException e) {
                     System.out.println("File '" + file.getPath() + "' not found.");
                 }
-            }
-        }).start();
+            }).start();
+        }
     }
 
 
-    private void sendMessage(@NotNull MessageType messageType, @NotNull String data) {
-        new Thread(() -> {
-            if (data == null || data.isEmpty()) {
-                return;
-            }
+    private void sendMessage(@NotNull MessageType messageType, @NotNull String data, boolean corrupted) {
+        if (data == null || data.isEmpty()) {
+            return;
+        }
 
-            if (messageType == MessageType.MSG) {
+        if (messageType == MessageType.MSG) {
+            int totalBytesToSent = data.getBytes().length;
+            int lastChunkSize = totalBytesToSent % Configurations.MAX_PACKET_SIZE;
 
+            System.out.println("\nSending the message of size " +  totalBytesToSent + " bytes, with " + (int)Math.ceil(1. * totalBytesToSent / Configurations.MAX_PACKET_SIZE) + " fragments of size " + Configurations.MAX_PACKET_SIZE + " bytes" + (lastChunkSize > 0 ? ", last fragment size is " + lastChunkSize + " bytes" : "."));
+
+            new Thread(() -> {
                 List<byte[]> chunks = ByteArrayUtil.chunkByteArray(data.getBytes(),
-                        Configurations.MAX_PACKET_SIZE - Configurations.HEADER_LENGTH - Configurations.DATA_HEADER_LENGTH
+                        Configurations.MAX_PACKET_SIZE
                 );
 
                 long messageId = atomicLong.getAndIncrement();
@@ -176,29 +214,31 @@ public class Sender {
                     ByteBuffer bb = ByteBuffer.allocate(headerLength + chunk.length);
 
                     DataHeader dataHeader = new DataHeader(messageId, chunks.size(), i);
-                    bb.put(Configurations.HEADER_LENGTH, dataHeader.toBytes());
+
+                    byte[] dataHeaderBytes = dataHeader.toBytes();
+
+                    bb.put(Configurations.HEADER_LENGTH, dataHeaderBytes);
                     bb.put(headerLength, chunk);
 
-                    byte[] dataForChecksum = new byte[headerLength + chunk.length - 8];
-
-                    System.arraycopy(bb.array(), 8, dataForChecksum, 0, dataForChecksum.length);
+                    byte[] combinedData = new byte[dataHeaderBytes.length + chunk.length];
+                    System.arraycopy(dataHeaderBytes, 0, combinedData, 0, dataHeaderBytes.length);
+                    System.arraycopy(chunk, 0, combinedData, dataHeaderBytes.length, chunk.length);
 
                     byte[] headerBytes = new Header(
                             messageType.getValue(),
                             atomicInteger.getAndIncrement(),
                             dataHeader.toBytes().length + chunk.length,
-                            dataForChecksum
-                            ).toBytes();
+                            combinedData
+                    ).toBytes();
 
                     bb.put(headerBytes);
 
                     byte[] message = bb.array();
 
-                    messages.add(message);
-                    addUnconfirmedPackage(message);
+                    messages.add(new Pair<>(corrupted, message));
                 }
-            }
-        }).start();
+            }).start();
+        }
     }
 
     public synchronized boolean isSending() {

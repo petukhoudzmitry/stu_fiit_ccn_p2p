@@ -1,5 +1,6 @@
 package com.pks.p2p;
 
+import com.pks.p2p.configs.Configurations;
 import com.pks.p2p.enums.StringConstants;
 import com.pks.p2p.manager.P2PManager;
 import com.pks.p2p.util.IPUtil;
@@ -12,7 +13,6 @@ import java.util.Objects;
 public class Main {
 
     public static void main(String[] args) throws Exception {
-
         int port = 8080;
 
         if (args.length > 0){
@@ -44,27 +44,59 @@ public class Main {
                 "Invalid port format. Try again: ",
                 () -> !p2pManager.isConnected());
 
+        while (destinationPort != null && Integer.parseInt(destinationPort) > Configurations.MAX_PORT_NUMBER) {
+            System.out.println("Port number is beyond the available range of port numbers. Try again:");
+            destinationPort = UserInputUtil.getUserValue(System.in, StringConstants.PORT_PATTERN.getValue(),
+                    "Invalid port format. Try again: ",
+                    () -> !p2pManager.isConnected());
+        }
+
         if(destinationPort != null && destinationAddress != null) {
             p2pManager.connect(InetAddress.getByName(destinationAddress), Integer.parseInt(destinationPort));
         }
 
         while(p2pManager.isConnected()) {
-            System.out.println("\nEnter a message to send to the peer, ':ip!' to output your ip or ':disconnect!' to close the program.");
+            System.out.println("""
+                    
+                    Enter a message to send to the peer, 'file:[filepath]' to send file to the peer, ':ip!' to output your ip, ':disconnect!' to disconnect and close the program,\
+                    
+                    ':fragment! to set the fragment size, or ':corrupted!' to simulate transmission of the corrupted data:
+                    """);
+
             String line = InputReaderUtil.readInput(System.in, p2pManager::isConnected);
+
             if (":disconnect!".equals(line)) {
                 p2pManager.disconnect();
                 continue;
-            } else if(":ip!".equals(line)) {
+            } else if (":ip!".equals(line)) {
                 System.out.println("Your IP address is: " + IPUtil.getIP());
+                continue;
+            } else if (":fragment!".equals(line)) {
+                System.out.println("Enter the size of the fragment:");
+                String fragmentSize = UserInputUtil.getUserValue(System.in, StringConstants.FRAGMENT_PATTERN.getValue(), "Invalid fragment format. Try again: ", p2pManager::isConnected);
+
+                while (fragmentSize != null && !Configurations.setFragmentSize(Integer.parseInt(fragmentSize))) {
+                    System.out.println("Fragment size is beyond the available range (" + Configurations.MIN_FRAGMENT_SIZE + ", " + Configurations.MAX_FRAGMENT_SIZE + ") of fragment sizes. Try again:");
+                    fragmentSize = UserInputUtil.getUserValue(System.in, StringConstants.FRAGMENT_PATTERN.getValue(), "Invalid fragment format. Try again: ", p2pManager::isConnected);
+                }
+                continue;
+            } else if (":corrupted!".equals(line)) {
+                System.out.println("Enter the message or 'file:[filepath]' to send the file to the peer:");
+                line = InputReaderUtil.readInput(System.in, p2pManager::isConnected);
+
+                if (line != null) {
+                    p2pManager.send(line, true);
+                }
+
                 continue;
             }
 
             if (line != null) {
-                p2pManager.send(line);
+                p2pManager.send(line, false);
             }
         }
 
-        System.out.println("Closing socket...");
+        System.out.println("\nClosing socket...");
         p2pManager.stop();
         System.out.println("Socket closed.");
     }

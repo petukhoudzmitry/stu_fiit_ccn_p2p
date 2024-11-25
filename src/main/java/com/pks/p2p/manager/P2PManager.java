@@ -22,20 +22,20 @@ public class P2PManager {
     public P2PManager(int port) {
         this.connection = new Connection(new ClientSocket(port));
         this.sender = new Sender(connection);
-        this.keepAliveHandler = new KeepAliveHandler(connection, sender, Configurations.CONNECTION_TIMEOUT, Configurations.KEEP_ALIVE_INTERVAL);
+        MsgHandler msgHandler = new MsgHandler();
+        FileHandler fileHandler = new FileHandler();
+        this.keepAliveHandler = new KeepAliveHandler(connection, sender, fileHandler, msgHandler, Configurations.CONNECTION_TIMEOUT, Configurations.KEEP_ALIVE_INTERVAL);
         this.handshakeHandler = new HandshakeHandler(connection, sender, keepAliveHandler, Configurations.CONNECTION_TIMEOUT);
         FinHandler finHandler = new FinHandler(connection, sender);
-        MsgHandler msgHandler = new MsgHandler(connection);
-        FileHandler fileHandler = new FileHandler(connection);
         this.receiver = new Receiver(connection, sender, List.of(handshakeHandler, keepAliveHandler, finHandler, msgHandler, fileHandler));
     }
 
-    public void send(String data) {
+    public void send(String data, boolean corrupted) {
         if (data != null && !data.isEmpty()) {
             if (data.startsWith("file:")) {
-                sender.send(MessageType.FILE, data);
+                sender.send(MessageType.FILE, data, corrupted);
             } else {
-                sender.send(MessageType.MSG, data);
+                sender.send(MessageType.MSG, data, corrupted);
             }
         }
     }
@@ -55,7 +55,7 @@ public class P2PManager {
 
     public synchronized void disconnect() {
         while (sender.isSending());
-        sender.send(MessageType.FIN, "");
+        sender.send(MessageType.FIN, "", false);
     }
 
     public synchronized boolean isConnected() {

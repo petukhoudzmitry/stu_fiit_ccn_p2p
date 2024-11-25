@@ -35,23 +35,13 @@ public class Receiver {
 
         setListenerThread(new Thread(() -> {
             while(getIsListening()) {
-//                byte[] buffer = new byte[Configurations.MAX_PACKET_SIZE];
-//                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-
-                ByteBuffer buffer = ByteBuffer.allocate(Configurations.MAX_PACKET_SIZE);
+                ByteBuffer buffer = ByteBuffer.allocate(Configurations.MAX_FRAGMENT_SIZE + Configurations.HEADER_LENGTH + Configurations.DATA_HEADER_LENGTH);
                 buffer.clear();
 
                 SocketAddress address = connection.getSocket().receive(buffer);
 
-
                 if (address != null) {
-
                     InetSocketAddress senderAddress = (InetSocketAddress) address;
-
-//                    if(connection.getConnected() && (!senderAddress.getAddress().equals(connection.getAddress()) || senderAddress.getPort() != connection.getPort())) {
-//                        System.out.println("Received a packet from an unknown source. Ignoring...");
-//                        continue;
-//                    }
 
                     buffer.flip();
                     byte[] data = new byte[buffer.remaining()];
@@ -59,11 +49,24 @@ public class Receiver {
 
                     Header header = Header.fromBytes(data);
 
-                    ByteBuffer byteBuffer = ByteBuffer.allocate(header.getLength() + Configurations.HEADER_LENGTH_WITHOUT_CHECKSUM);
-                    byteBuffer.put(header.toBytesForChecksum()).put(data, Configurations.HEADER_LENGTH, header.getLength());
+                    byte[] headerBytes = header.toBytesForChecksum();
+                    byte[] checksumBytes = new byte[data.length  - Configurations.HEADER_LENGTH + Configurations.HEADER_LENGTH_WITHOUT_CHECKSUM];
 
-                    if(Checksum.checkChecksum(byteBuffer.array(), header.getChecksum())) {
-                        System.out.println("Received a corrupted packet. Ignoring...");
+                    byte[] checksum = new byte[data.length - checksumBytes.length];
+
+                    System.arraycopy(data, Configurations.HEADER_LENGTH_WITHOUT_CHECKSUM, checksum, 0, checksum.length);
+
+                    ByteBuffer checksumBuffer = ByteBuffer.wrap(checksum);
+                    long checksumValue = checksumBuffer.getLong();
+
+                    System.arraycopy(headerBytes, 0, checksumBytes, 0, headerBytes.length);
+                    System.arraycopy(data, Configurations.HEADER_LENGTH, checksumBytes, headerBytes.length, data.length - Configurations.HEADER_LENGTH);
+
+                    if(!Checksum.checkChecksum(checksumBytes, checksumValue)) {
+                        System.out.println("Received a corrupted fragment with sequence number " + header.getSequenceNumber());
+                        Header nackHeader = new Header(MessageType.NACK.getValue(), header.getSequenceNumber());
+                        sender.send(nackHeader.toBytes());
+
                         continue;
                     }
 
@@ -80,6 +83,7 @@ public class Receiver {
                         switch (messageType) {
                             case KEEP_ALIVE, FIN, FIN_ACK, MSG, FILE -> packageHandlers.forEach(handler -> handler.receivePackage(header, packet));
                             case ACK -> sender.confirmPackage(header.getSequenceNumber());
+                            case NACK -> sender.resendMessage(header.getSequenceNumber());
                             default -> {}
                         }
                     } else {

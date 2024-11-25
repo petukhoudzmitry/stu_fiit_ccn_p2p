@@ -10,6 +10,6 @@ public class Checksum {
     }
 
     public static boolean checkChecksum(byte[] data, long checksum) {
-        return Checksum.calculateChecksum(data) != checksum;
+        return Checksum.calculateChecksum(data) == checksum;
     }
 }

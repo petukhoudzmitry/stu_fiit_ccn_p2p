@@ -1,7 +1,6 @@
 package com.pks.p2p.handlers;
 
 import com.pks.p2p.configs.Configurations;
-import com.pks.p2p.connection.Connection;
 import com.pks.p2p.enums.MessageType;
 import com.pks.p2p.protocol.DataHeader;
 import com.pks.p2p.protocol.Header;
@@ -10,19 +9,12 @@ import org.jetbrains.annotations.NotNull;
 
 import java.net.DatagramPacket;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class MsgHandler implements PackageHandler {
 
-    private final Connection connection;
-
     private final ConcurrentHashMap<Long, Pair<Integer, byte[][]>> messages = new ConcurrentHashMap<>();
-    private volatile boolean isRunning = false;
-
-
-    public MsgHandler(Connection connection) {
-        this.connection = connection;
-    }
-
+    private final ConcurrentLinkedQueue<Long> receivedMessages = new ConcurrentLinkedQueue<>();
 
 
     @Override
@@ -40,12 +32,19 @@ public class MsgHandler implements PackageHandler {
 
             System.arraycopy(data, Configurations.HEADER_LENGTH + Configurations.DATA_HEADER_LENGTH, message, 0, message.length);
 
-            Pair<Integer, byte[][]> value = messages.getOrDefault(dataHeader.getId(),
-                    new Pair<>(
-                            dataHeader.getTotalPackages(),
-                            new byte[dataHeader.getTotalPackages()][]
-                    )
-            );
+            Pair<Integer, byte[][]> value = messages.get(dataHeader.getId());
+
+            if (value == null) {
+                if (receivedMessages.contains(dataHeader.getId())) {
+                    return;
+                }
+                value = new Pair<>(
+                                dataHeader.getTotalPackages(),
+                                new byte[dataHeader.getTotalPackages()][]
+                        );
+            }
+
+            System.out.println("Received a fragment with sequence number " + header.getSequenceNumber());
 
             value.getSecond()[dataHeader.getPackageNumber()] = message;
             messages.put(dataHeader.getId(), value);
@@ -74,17 +73,13 @@ public class MsgHandler implements PackageHandler {
                     System.out.println(message);
 
                     messages.remove(key);
+                    receivedMessages.add(key);
                 }
             });
         }).start();
     }
 
-
-    private synchronized boolean isRunning() {
-        return isRunning;
-    }
-
-    private synchronized void setRunning(boolean running) {
-        isRunning = running;
+    public boolean hasUnreceivedMessages() {
+        return !messages.isEmpty();
     }
 }

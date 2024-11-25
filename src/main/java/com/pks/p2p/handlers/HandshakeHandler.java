@@ -8,6 +8,9 @@ import org.jetbrains.annotations.NotNull;
 
 import java.net.DatagramPacket;
 import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class HandshakeHandler implements PackageHandler {
 
@@ -36,14 +39,14 @@ public class HandshakeHandler implements PackageHandler {
                 if(!connection.getConnected()) {
                     connection.setAddress(packet.getAddress());
                     connection.setPort(packet.getPort());
-                    sender.send(MessageType.SYN_ACK, "");
+                    sender.send(MessageType.SYN_ACK, "", false);
                 }
             }
             case MessageType.SYN_ACK -> {
                 System.out.println("\nYour are connected to " + connection.getAddress() + ":" + connection.getPort());
                 connection.setConnected(true);
                 keepAliveHandler.start();
-                sender.send(MessageType.ACK, "");
+                sender.send(MessageType.ACK, "", false);
                 sender.startSending();
             }
             case MessageType.ACK -> {
@@ -58,7 +61,14 @@ public class HandshakeHandler implements PackageHandler {
 
     public void performHandshake() {
         long startTime = System.currentTimeMillis();
-        sender.send(MessageType.SYN, "");
-        while(System.currentTimeMillis() - startTime < timeout && !connection.getConnected()){}
+        try (ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor()) {
+            executor.scheduleAtFixedRate(() -> {
+                if (!connection.getConnected()) {
+                    sender.send(MessageType.SYN, "", false);
+                }
+            }, 0, timeout / 10, TimeUnit.MILLISECONDS);
+            while (!connection.getConnected() && System.currentTimeMillis() - startTime < timeout) {}
+            executor.shutdown();
+        }
     }
 }
