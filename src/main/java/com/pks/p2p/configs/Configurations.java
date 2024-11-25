@@ -31,14 +31,14 @@ public class Configurations {
             File directory = new File(path);
             if (!directory.exists()) {
                 if (directory.mkdirs()) {
-                    System.out.println("Directory created: " + directory.getAbsolutePath());
+                    System.out.println("\nDirectory created: " + directory.getAbsolutePath());
                     DOWNLOAD_PATH = path;
                 } else {
-                    System.err.println("Failed to create directory: " + directory.getAbsolutePath());
+                    System.err.println("\nFailed to create directory: " + directory.getAbsolutePath());
                     return false;
                 }
             } else if (!directory.isDirectory()) {
-                System.err.println("Path is not a directory: " + directory.getAbsolutePath());
+                System.err.println("\nPath is not a directory: " + directory.getAbsolutePath());
                 return false;
             } else {
                 DOWNLOAD_PATH = path;
@@ -52,9 +52,9 @@ public class Configurations {
 
     public static boolean setFragmentSize(int size) {
         if (size < MIN_FRAGMENT_SIZE) {
-            System.out.println("Fragment size must be greater than " + (MIN_FRAGMENT_SIZE - 1));
+            System.out.println("\nFragment size must be greater than " + (MIN_FRAGMENT_SIZE - 1));
         } else if (size > MAX_FRAGMENT_SIZE) {
-            System.out.println("Fragment size must be less than " + MAX_FRAGMENT_SIZE);
+            System.out.println("\nFragment size must be less than " + MAX_FRAGMENT_SIZE);
         } else {
             MAX_PACKET_SIZE = size;
             return true;

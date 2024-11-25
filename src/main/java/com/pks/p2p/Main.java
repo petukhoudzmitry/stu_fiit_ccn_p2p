@@ -69,19 +69,19 @@ public class Main {
                 p2pManager.disconnect();
                 continue;
             } else if (":ip!".equals(line)) {
-                System.out.println("Your IP address is: " + IPUtil.getIP());
+                System.out.println("\nYour IP address is: " + IPUtil.getIP());
                 continue;
             } else if (":fragment!".equals(line)) {
-                System.out.println("Enter the size of the fragment:");
-                String fragmentSize = UserInputUtil.getUserValue(System.in, StringConstants.FRAGMENT_PATTERN.getValue(), "Invalid fragment format. Try again: ", p2pManager::isConnected);
+                System.out.println("\nEnter the size of the fragment:\n");
+                String fragmentSize = UserInputUtil.getUserValue(System.in, StringConstants.FRAGMENT_PATTERN.getValue(), "Invalid fragment format. Try again: \n", p2pManager::isConnected);
 
                 while (fragmentSize != null && !Configurations.setFragmentSize(Integer.parseInt(fragmentSize))) {
-                    System.out.println("Fragment size is beyond the available range (" + Configurations.MIN_FRAGMENT_SIZE + ", " + Configurations.MAX_FRAGMENT_SIZE + ") of fragment sizes. Try again:");
-                    fragmentSize = UserInputUtil.getUserValue(System.in, StringConstants.FRAGMENT_PATTERN.getValue(), "Invalid fragment format. Try again: ", p2pManager::isConnected);
+                    System.out.println("\nFragment size is beyond the available range (" + Configurations.MIN_FRAGMENT_SIZE + ", " + Configurations.MAX_FRAGMENT_SIZE + ") of fragment sizes. Try again:\n");
+                    fragmentSize = UserInputUtil.getUserValue(System.in, StringConstants.FRAGMENT_PATTERN.getValue(), "Invalid fragment format. Try again: \n", p2pManager::isConnected);
                 }
                 continue;
             } else if (":corrupted!".equals(line)) {
-                System.out.println("Enter the message or 'file:[filepath]' to send the file to the peer:");
+                System.out.println("\nEnter the message or 'file:[filepath]' to send the file to the peer:\n");
                 line = InputReaderUtil.readInput(System.in, p2pManager::isConnected);
 
                 if (line != null) {
@@ -90,11 +90,11 @@ public class Main {
 
                 continue;
             } else if (":path!".equals(line)) {
-                System.out.println("Enter the path for saving files:");
+                System.out.println("\nEnter the path for saving files:\n");
                 String path = InputReaderUtil.readInput(System.in, p2pManager::isConnected);
 
                 while (path != null && !Configurations.setDownloadPath(path)) {
-                    System.out.println("Invalid path. Try again:");
+                    System.out.println("\nInvalid path. Try again:\n");
                     path = InputReaderUtil.readInput(System.in, p2pManager::isConnected);
                 }
 
@@ -108,6 +108,6 @@ public class Main {
 
         System.out.println("\nClosing socket...");
         p2pManager.stop();
-        System.out.println("Socket closed.");
+        System.out.println("\nSocket closed.");
     }
 }

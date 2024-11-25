@@ -54,10 +54,10 @@ public class KeepAliveHandler implements PackageHandler {
         if (System.currentTimeMillis() - lastReceived > timeout) {
             System.out.println("\nConnection timed out.");
             if (fileHandler.hasUnreceivedFiles()) {
-                System.out.println("There are unreceived files.");
+                System.out.println("\nThere are unreceived files.");
             }
             if (msgHandler.hasUnreceivedMessages()) {
-                System.out.println("There are unreceived messages.");
+                System.out.println("\nThere are unreceived messages.");
             }
             stop();
         }

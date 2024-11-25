@@ -118,7 +118,7 @@ public class FileHandler implements PackageHandler {
                     for (byte[] bytes : value) {
                         fileOutputStream.write(bytes);
                     }
-                    System.out.println("\nReceived a file: " + file.getAbsoluteFile() + " of size " + file.length() + String.format(" bytes. Transfer time: %.2f s.", ((end - firstPackageTimes.get(key)) / 1000.0)));
+                    System.out.println("\nReceived a file: " + file.getAbsoluteFile() + " of size " + file.length() + String.format(" bytes. Transfer time: %.2f s.\n", ((end - firstPackageTimes.get(key)) / 1000.0)));
                     messages.remove(key);
                     firstPackageTimes.remove(key);
                     receivedFiles.add(key);

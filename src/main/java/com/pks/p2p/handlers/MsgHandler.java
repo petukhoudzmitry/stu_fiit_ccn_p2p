@@ -64,13 +64,13 @@ public class MsgHandler implements PackageHandler {
                 }
 
                 if (value.getFirst() == i) {
-                    StringBuilder message = new StringBuilder("Received a message: ");
+                    StringBuilder message = new StringBuilder("\nReceived a message: ");
 
                     for (byte[] data : value.getSecond()) {
                         message.append(new String(data));
                     }
 
-                    System.out.println(message);
+                    System.out.println(message + "\n");
 
                     messages.remove(key);
                     receivedMessages.add(key);
