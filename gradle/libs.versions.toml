@@ -10,7 +10,7 @@ kotlin-version = "2.0.21"
 com-guardsquare-proguard-gradle = { module = "com.guardsquare:proguard-gradle", version.ref = "proguard-version" }
 org-junit-junit-bom = { module = "org.junit:junit-bom", version.ref = "junit-bom-version" }
 org-junit-jupiter-junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
-kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "kotlin-version" }
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin-version" }
 
 
 [plugins]
