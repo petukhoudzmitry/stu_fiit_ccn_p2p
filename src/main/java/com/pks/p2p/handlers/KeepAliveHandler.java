@@ -22,7 +22,7 @@ public class KeepAliveHandler implements PackageHandler {
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private final long timeout;
     private final long interval;
-    private long lastReceived = System.currentTimeMillis();
+    private long lastReceived;
 
     public KeepAliveHandler(Connection connection, Sender sender, FileHandler fileHandler, MsgHandler msgHandler, long timeout, long interval) {
         this.connection = connection;
@@ -41,13 +41,13 @@ public class KeepAliveHandler implements PackageHandler {
     }
 
     public void start() {
-        executorService.scheduleAtFixedRate(this::sendKeepAlive, 0, interval, TimeUnit.MILLISECONDS);
-        executorService.scheduleAtFixedRate(this::checkTimeout, 0, interval, TimeUnit.MILLISECONDS);
+        lastReceived = System.currentTimeMillis();
+        executorService.scheduleAtFixedRate(this::sendKeepAlive, interval, interval, TimeUnit.MILLISECONDS);
+        executorService.scheduleAtFixedRate(this::checkTimeout, interval, interval, TimeUnit.MILLISECONDS);
     }
 
     private void sendKeepAlive() {
         sender.send(MessageType.KEEP_ALIVE, "", false);
-
     }
 
     private void checkTimeout() {

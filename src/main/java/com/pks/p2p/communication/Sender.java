@@ -17,7 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -27,7 +27,7 @@ public class Sender {
     private final AtomicInteger atomicInteger = new AtomicInteger(0);
     private final AtomicLong atomicLong = new AtomicLong(0L);
 
-    private final ConcurrentLinkedQueue<Pair<Boolean, byte[]>> messages = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedDeque<Pair<Boolean, byte[]>> messages = new ConcurrentLinkedDeque<>();
     private final ConcurrentHashMap<Integer, Pair<Long, byte[]>> unconfirmedPackages = new ConcurrentHashMap<>();
 
     public Sender(Connection connection) {
@@ -41,6 +41,11 @@ public class Sender {
                     Pair<Boolean, byte[]> pair = messages.poll();
                     byte[] message = pair.getSecond();
 
+                    MessageType messageType = MessageType.fromInt(Header.fromBytes(message).getMessageType());
+                    if (messageType == MessageType.MSG || messageType == MessageType.FILE || messageType == MessageType.KEEP_ALIVE) {
+                        addUnconfirmedPackage(message);
+                    }
+
                     if (pair.getFirst()) {
                         byte[] corruptedMessage = new byte[message.length];
                         System.arraycopy(message, 0, corruptedMessage, 0, message.length);
@@ -50,10 +55,6 @@ public class Sender {
                         send(message);
                     }
 
-                    MessageType messageType = MessageType.fromInt(Header.fromBytes(message).getMessageType());
-                    if (messageType == MessageType.MSG || messageType == MessageType.FILE) {
-                        addUnconfirmedPackage(message);
-                    }
                 }
             }
         }).start();
@@ -111,7 +112,8 @@ public class Sender {
             byte[] message = bb.array();
 
             switch (messageType) {
-                case SYN, SYN_ACK, ACK, KEEP_ALIVE -> send(message);
+                case SYN, SYN_ACK -> send(message);
+                case KEEP_ALIVE, ACK -> messages.addFirst(new Pair<>(corrupted, message));
                 default -> messages.add(new Pair<>(corrupted, message));
             }
         }).start();

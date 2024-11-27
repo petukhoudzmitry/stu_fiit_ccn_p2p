@@ -58,9 +58,13 @@ public class Main {
         while(p2pManager.isConnected()) {
             System.out.println("""
                     
-                    Enter a message to send to the peer, 'file:[filepath]' to send file to the peer, ':ip!' to output your ip, ':disconnect!' to disconnect and close the program,\
-                    
-                    ':fragment! to set the fragment size, ':path!' to set the path for saving files, or ':corrupted!' to simulate transmission of the corrupted data:
+                    Enter a message to send to the peer,
+                    file:[filepath] to send file to the peer,
+                    :ip! to output your ip,
+                    :disconnect! to disconnect and close the program,
+                    :fragment! to set the fragment size,
+                    :path! to set the path for saving files, or
+                    :corrupted! to simulate transmission of the corrupted data:
                     """);
 
             String line = InputReaderUtil.readInput(System.in, p2pManager::isConnected);

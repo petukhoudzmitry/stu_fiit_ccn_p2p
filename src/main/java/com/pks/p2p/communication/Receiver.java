@@ -72,7 +72,7 @@ public class Receiver {
 
                     MessageType messageType = Objects.requireNonNull(MessageType.fromInt(header.getMessageType()));
 
-                    if (messageType == MessageType.MSG || messageType == MessageType.FILE) {
+                    if (messageType == MessageType.MSG || messageType == MessageType.FILE || messageType == MessageType.KEEP_ALIVE) {
                         Header ackHeader = new Header(MessageType.ACK.getValue(), header.getSequenceNumber());
                         sender.send(ackHeader.toBytes());
                     }
