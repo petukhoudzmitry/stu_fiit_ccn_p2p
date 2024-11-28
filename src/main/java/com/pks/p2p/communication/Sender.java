@@ -138,7 +138,12 @@ public class Sender {
             long totalBytesToSent = fileNameBytes.length + file.length();
             int lastChunkSize = (int) (totalBytesToSent % Configurations.MAX_PACKET_SIZE);
 
-            System.out.println("\nSending the file: " + file.getName() + " of size " +  totalBytesToSent + " bytes, with " + (int)Math.ceil(1. * totalBytesToSent / Configurations.MAX_PACKET_SIZE) + " fragments of size " + Configurations.MAX_PACKET_SIZE + " bytes" + (lastChunkSize > 0 ? ", last fragment size is " + lastChunkSize + " bytes" : "."));
+            int headerLength = Configurations.HEADER_LENGTH + Configurations.DATA_HEADER_LENGTH;
+            int packetsAmount = (int)Math.ceil(1. * totalBytesToSent / Configurations.MAX_PACKET_SIZE);
+            int headerBytesAmount = headerLength * packetsAmount;
+
+            System.out.println("\nSending the file: " + file.getName() + " of size " +  totalBytesToSent + " bytes, with " + packetsAmount + " fragments of size " + Configurations.MAX_PACKET_SIZE + " bytes" + (lastChunkSize > 0 ? ", last fragment size is " + lastChunkSize + " bytes" : "."));
+            System.out.println("Sent " + headerBytesAmount + " bytes of header data. Percentage of header data: " + String.format("%.2f", 100. * headerBytesAmount / (headerBytesAmount + totalBytesToSent)) + "%");
 
             new Thread(() -> {
                 try {
@@ -199,7 +204,12 @@ public class Sender {
             int totalBytesToSent = data.getBytes().length;
             int lastChunkSize = totalBytesToSent % Configurations.MAX_PACKET_SIZE;
 
+            int headerLength = Configurations.HEADER_LENGTH + Configurations.DATA_HEADER_LENGTH;
+            int packetsAmount = (int)Math.ceil(1. * totalBytesToSent / Configurations.MAX_PACKET_SIZE);
+            int headerBytesAmount = headerLength * packetsAmount;
+
             System.out.println("\nSending the message of size " +  totalBytesToSent + " bytes, with " + (int)Math.ceil(1. * totalBytesToSent / Configurations.MAX_PACKET_SIZE) + " fragments of size " + Configurations.MAX_PACKET_SIZE + " bytes" + (lastChunkSize > 0 ? ", last fragment size is " + lastChunkSize + " bytes" : "."));
+            System.out.println("Sent " + headerBytesAmount + " bytes of header data. Percentage of header data: " + String.format("%.2f", 100. * headerBytesAmount / (headerBytesAmount + totalBytesToSent)) + "%");
 
             new Thread(() -> {
                 List<byte[]> chunks = ByteArrayUtil.chunkByteArray(data.getBytes(),
@@ -207,8 +217,6 @@ public class Sender {
                 );
 
                 long messageId = atomicLong.getAndIncrement();
-
-                int headerLength = Configurations.HEADER_LENGTH + Configurations.DATA_HEADER_LENGTH;
 
                 for (int i = 0; i < chunks.size(); i++) {
                     byte[] chunk = chunks.get(i);

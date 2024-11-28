@@ -54,29 +54,33 @@ public class MsgHandler implements PackageHandler {
     }
 
     private void run() {
-        new Thread(() -> {
-            messages.forEach((key, value) -> {
-                int i = 0;
-                for (; i < value.getSecond().length; i++) {
-                    if (value.getSecond()[i] == null) {
-                        break;
-                    }
+        messages.forEach((key, value) -> {
+            int i = 0;
+            for (; i < value.getSecond().length; i++) {
+                if (value.getSecond()[i] == null) {
+                    break;
+                }
+            }
+
+            if (value.getFirst() == i) {
+                StringBuilder message = new StringBuilder("\nReceived a message: ");
+
+                int dataBytes = 0;
+                int headerBytes = (Configurations.HEADER_LENGTH + Configurations.DATA_HEADER_LENGTH) * value.getSecond().length;
+
+                for (byte[] data : value.getSecond()) {
+                    dataBytes += data.length;
+                    message.append(new String(data));
                 }
 
-                if (value.getFirst() == i) {
-                    StringBuilder message = new StringBuilder("\nReceived a message: ");
+                System.out.println(message + "\n");
 
-                    for (byte[] data : value.getSecond()) {
-                        message.append(new String(data));
-                    }
+                System.out.println("Received " + headerBytes + " bytes of header data. Percentage of header data: " + String.format("%.2f", (100. * headerBytes / (headerBytes + dataBytes))) + "%");
 
-                    System.out.println(message + "\n");
-
-                    messages.remove(key);
-                    receivedMessages.add(key);
-                }
-            });
-        }).start();
+                messages.remove(key);
+                receivedMessages.add(key);
+            }
+        });
     }
 
     public boolean hasUnreceivedMessages() {

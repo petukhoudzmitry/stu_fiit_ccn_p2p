@@ -115,11 +115,18 @@ public class FileHandler implements PackageHandler {
                 value = removeFileName(value);
 
                 try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
+                    int headerBytes = (Configurations.HEADER_LENGTH + Configurations.DATA_HEADER_LENGTH) * value.length;
+                    int dataBytes = (fileName + "\n").getBytes().length;
+
                     for (byte[] bytes : value) {
+                        dataBytes += bytes.length;
                         fileOutputStream.write(bytes);
                     }
                     System.out.println("\nReceived a file:" + file.getAbsolutePath());
                     System.out.println("of size " + file.length() + String.format(" bytes. Transfer time: %.2f s.\n", ((end - firstPackageTimes.get(key)) / 1000.0)));
+
+
+                    System.out.println("Received " + headerBytes + " bytes of header data. Percentage of header data: " + String.format("%.2f", (100. * headerBytes / (headerBytes + dataBytes))) + "%");
 
                     messages.remove(key);
                     firstPackageTimes.remove(key);
